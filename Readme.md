@@ -1,46 +1,64 @@
-## 1. Giới thiệu
+# Weather API
 
-- Weather API là một phần mềm cung cấp dữ liệu thời tiết của các thành phố trên toàn thế giới
-- Sử dụng dữ liệu từ visualcrossing.com
-- Sử dụng Redis để lưu dữ liệu
-- Redis được build trên Docker Desktop
+Một dịch vụ nhỏ cung cấp dữ liệu thời tiết (hiện tại + dự báo 7 ngày) cho các thành phố trên toàn thế giới. Dữ liệu được lấy từ Visual Crossing Weather API và được cache bằng Redis để tăng tốc phản hồi.
 
-## 2. Tính năng
+> Lưu ý: file này trình bày cách chạy dự án cục bộ (development) và các lệnh hữu ích để kiểm thử Redis.
 
-- Lấy thông tin dữ liệu hiện tại và 7 ngày tiếp theo
-- Sử dụng Redis caching với TTL tự động trong 12h
-- Sử dụng rate limiting, error handling
-- Tăng tốc độ phản hồi, cache giúp trả về kết quả lập tức
+## Nội dung chính
 
-## 3. Công nghệ sử dụng
+- Mô tả ngắn gọn dự án
+- Hướng dẫn cài đặt và chạy (Redis bằng Docker + Node.js)
+- Biến môi trường cần thiết
+- Các endpoint API và ví dụ
+- Cấu trúc thư mục
+- Các lệnh Redis hữu ích
 
-- Node.js:20.18.3 Express.js Redis:7.4.2 Axios Docker Visual crossing weather API
+---
 
-## 4. Thư mục
+## Tính năng
 
+- Trả về dữ liệu thời tiết hiện tại và dự báo 7 ngày
+- Caching bằng Redis với TTL mặc định (12 giờ)
+- Rate limiting và error handling cơ bản
+- Trả kết quả nhanh hơn khi cache hit
+
+## Công nghệ sử dụng
+
+- Node.js (20.x)
+- Express
+- Redis
+- Axios
+- Docker (để chạy Redis nếu cần)
+- Visual Crossing Weather API
+
+## Cấu trúc thư mục
+
+```
 weather-api/
 ├── src/
 │   ├── config/              # Cấu hình
-│   │   ├── env.js          # Environment variables
-│   │   └── redis.js        # Redis client setup
+│   │   ├── env.js           # Environment variables
+│   │   └── redis.js         # Redis client setup
 │   ├── controllers/         # Controllers
 │   │   └── weatherController.js
 │   ├── services/            # Business logic
 │   │   ├── weatherService.js    # Gọi Visual Crossing API
 │   │   └── cacheService.js      # Xử lý Redis cache
 │   ├── middlewares/         # Middlewares
-│   │   ├── rateLimiter.js      # Rate limiting
-│   │   └── errorHandler.js     # Error handling
+│   │   ├── rateLimiter.js       # Rate limiting
+│   │   └── errorHandler.js      # Error handling
 │   └── routes/              # Route definitions
 │       └── weatherRoutes.js
 ├── .env                     # Environment variables
 ├── .gitignore
 ├── package.json
-├── server.js               # Entry point
+├── server.js                # Entry point
 └── README.md
+```
 
-## 5. Luồng hoạt động
+## Luồng hoạt động
 
+```
 Client -> Express -> Controller -> Cache -> Redis
                   |                     |
              cache miss                 |
@@ -50,98 +68,129 @@ Client -> Express -> Controller -> Cache -> Redis
                   Visual Crossing API   |
                   |                     |
                   -------Save to cache---
+```
 
-## 6. Build app
+## Yêu cầu (Prerequisites)
 
-* Redis
-    - Cài đặt Docker desktop
-    - Chạy câu lệnh trên cmd: ` docker run -d --name redis-weather -p 6379:6379 redis:latest `
-        + `-d` : Chạy ở background
-        + `--name redis-weather` : đặt tên container
-        + `-p 6379:6379` : map port 6379
-        + `redis:lastest` : phiên bản mới nhất
-    - Kiểm tra Redis trên cmd
-        + `docker ps`
-        + Dừng chạy: `docker stop redis-weather`
-        + Khởi động lại `docker start redis-weather`
-    - Kiểm tra Redis bằng lệnh sử dụng redis cli
-        + `docker exec -it redis-weather redis-cli`
-        + Xem tất cả keys
-            `KEYS *`
-        + Xem giá trị của key
-            `GET weather:hanoi:metric`
-        + Xem thời gian còn lại của key (TTL)
-            `TTL weather:hanoi:metric`
-        + Xóa key
-            `DEL weather:hanoi:metric`
-        + Xóa tất cả
-            `FLUSHALL`
-        + Xem keys có pattern
-            `KEYS weather:*`
-        + Xem thông tin Redis
-            `INFO`
-        + Xem số lượng keys
-            `DBSIZE`
-        + Monitor realtime commands
-            `MONITOR`
+- Docker (để chạy Redis cục bộ)
+- Node.js v20+ và npm
+- Key từ Visual Crossing (WEATHER_API_KEY)
 
-    ### Nâng cao hơn
-    - Truy cập vào redis thông qua docker
-        + Vào Redis CLI trong container
-            `docker exec -it redis-weather redis-cli`
-        + Hoặc nếu có password
-            `docker exec -it redis-weather redis-cli -a your_password`
-    - Run redis với volumn để lưu trữ dữ liệu
-        + `docker volume create redis-weather-data`
-        + docker run -d \
-            --name redis-weather \
-            -p 6379:6379 \
-            -v redis-weather-data:/data \
-            redis:latest redis-server --appendonly yes
-    - Run redis sử dụng docker compose (prod)
-        + Chạy `docker-compose up -d`
-        + Kiểm tra container `docker ps`
-        + Xem logs `redis-weather`
-        + Kiểm tra redis hoạt động: `docker exec -it redis-weather redis-cli ping` kết quả: PONG
+## Biến môi trường (ví dụ `.env`)
 
-        * Các câu lệnh trên docker
-            + `docker stop redis-weather`
-            + `docker start redis-weather`
-            + `docker restart redis-weather`
-            + `docker logs redis-weather`
-            + `docker logs -f redis-weather`
-            + `docker rm redis-weather`
-            + `docker rm redis-weather docker volume rm redis-weather-data`
-* Node.js app
-    - Tạo package.json : `npm init -y`
-    - Install   `npm install express axios redis dotenv express-rate-limit`
-                `npm install -D nodemon`
-    - .env:     WEATHER_API_KEY=`key lấy trên visual crossing`
-                REDIS_HOST=
-                REDIS_PORT=
-                PORT=
-                CACHE_EXPIRATION=
-    - Run backend: `npm start`
+```
+WEATHER_API_KEY=your_visual_crossing_key
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+PORT=3000
+CACHE_EXPIRATION=43200    # giây (12 giờ)
+```
 
-* Api test
-    - `GET /api/weather/:city`
-        + parameter: city
-        + query parameters: unit: metric, us, uk
-    - `DELETE /api/cache/:city`
-    - `DELETE /api/cache`
-* Cách hoạt động
-    - Client req /api/weather/hanoi -> rate limiter -> controller validate input -> [Cachehit] trả về data từ redis / [Cachemiss] trả về data từ Visual crossing api -> lưu kết quả vào redis TTL 12hrs -> trả về response
-    - Caching format: `weather:{city}:{unit}`
+## Chạy Redis (local / development)
 
-### Kết luận
-1. Cách chạy code
-    - Cài đặt: docker, redis, nodejs
-    - Cài đặt redis: `docker run -d --name redis-weather -p 6379:6379 redis:latest`
-    - Cặt đặt nodejs:   `npm init -y`
-                        `npm i`
-                        `npm start`
-    - Test api: postman
+Cách nhanh (Docker run):
 
-### Link 
+```powershell
+# chạy Redis trong container (background)
+docker run -d --name redis-weather -p 6379:6379 redis:latest
 
-https://roadmap.sh/projects/weather-api-wrapper-service
+# kiểm tra container
+docker ps
+
+# stop / start
+docker stop redis-weather
+docker start redis-weather
+
+# vào redis-cli (nếu cần)
+docker exec -it redis-weather redis-cli
+```
+
+Lưu trữ dữ liệu bằng volume:
+
+```powershell
+docker volume create redis-weather-data
+docker run -d --name redis-weather -p 6379:6379 -v redis-weather-data:/data redis:latest redis-server --appendonly yes
+```
+
+Sử dụng Docker Compose (nếu có `docker-compose.yml`):
+
+```powershell
+docker-compose up -d
+```
+
+Lệnh kiểm tra hoạt động:
+
+```powershell
+docker exec -it redis-weather redis-cli ping  # trả về PONG
+```
+
+Các lệnh Redis hữu ích (trong `redis-cli`):
+
+```
+KEYS *
+GET weather:hanoi:metric
+TTL weather:hanoi:metric
+DEL weather:hanoi:metric
+FLUSHALL
+KEYS weather:*
+INFO
+DBSIZE
+MONITOR
+```
+
+## Cài đặt và chạy Node.js app
+
+```powershell
+# cài dependencies
+npm install
+
+# phát triển với nodemon (nếu đã cài -D nodemon)
+npm run dev    # hoặc npm start theo script trong package.json
+```
+
+## API Endpoints
+
+- GET /api/weather/:city
+  - path parameter: `city` (ví dụ: `hanoi`)
+  - query parameters: `unit` (ví dụ: `metric`, `us`, `uk`)
+  - trả về dữ liệu thời tiết (cached nếu có)
+
+- DELETE /api/cache/:city
+  - xóa cache cho thành phố
+
+- DELETE /api/cache
+  - xóa toàn bộ cache (chỉ dùng khi cần)
+
+Ví dụ curl:
+
+```bash
+curl "http://localhost:3000/api/weather/hanoi?unit=metric"
+```
+
+## Cách hoạt động tóm tắt
+
+- Client gửi yêu cầu tới `/api/weather/:city`
+- Middleware rate limiter chặn quá nhiều request
+- Controller kiểm tra cache (Redis)
+  - Nếu cache hit -> trả dữ liệu từ Redis
+  - Nếu cache miss -> gọi Visual Crossing API, lưu kết quả vào Redis (TTL 12 giờ), sau đó trả kết quả
+
+Format cache: `weather:{city}:{unit}`
+
+## Kiểm tra và gỡ lỗi
+
+- Kiểm tra logs của server để xem lỗi
+- Kiểm tra container Redis (docker ps, docker logs)
+- Dùng `redis-cli` để kiểm tra key/TTL
+
+## Gợi ý triển khai / production
+
+- Dùng Redis managed (Azure Cache, AWS ElastiCache) cho production
+- Cấu hình rate limiting, logging, monitoring
+- Bảo vệ API key (store trong secret manager)
+
+## Liên kết
+
+- Project reference: https://roadmap.sh/projects/weather-api-wrapper-service
+
+---
